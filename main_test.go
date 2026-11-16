@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
-func save(name string, size int, path string) error {
-	err := os.WriteFile(filepath.Join(path, name), bytes.Repeat([]byte{0xFF}, size), 0o600)
+func save(path string, size int) error {
+	err := os.WriteFile(path, bytes.Repeat([]byte{0xFF}, size), 0o600)
 	if err != nil {
 		return fmt.Errorf("cant write byte: %v", err)
 	}
@@ -28,19 +29,19 @@ func TestScan(t *testing.T) {
 		t.Fatalf("cant create sibling: %v", err)
 	}
 
-	if err := save("a.txt", 3, dir); err != nil {
+	if err := save(filepath.Join(dir, "a.txt"), 3); err != nil {
 		t.Fatalf("cant save txt: %v", err)
 	}
 
-	if err := save("b.txt", 5, filepath.Join(dir, "sub")); err != nil {
+	if err := save(filepath.Join(dir, "sub", "b.txt"), 5); err != nil {
 		t.Fatalf("cant save txt: %v", err)
 	}
 
-	if err := save("c.txt", 7, filepath.Join(dir, "sub", "deep")); err != nil {
+	if err := save(filepath.Join(dir, "sub", "deep", "c.txt"), 7); err != nil {
 		t.Fatalf("cant save txt: %v", err)
 	}
 
-	if err := save("d.txt", 11, filepath.Join(dir, "sibling")); err != nil {
+	if err := save(filepath.Join(dir, "sibling", "d.txt"), 11); err != nil {
 		t.Fatalf("cant save txt: %v", err)
 	}
 
@@ -80,7 +81,7 @@ func TestSymbolinkFilesNotCounted(t *testing.T) {
 		t.Fatalf("cant creaste the folders: %v", err)
 	}
 
-	if err := save("a.txt", 3, filepath.Join(dir)); err != nil {
+	if err := save(filepath.Join(dir, "a.txt"), 3); err != nil {
 		t.Fatalf("cant save a file: %v", err)
 	}
 
@@ -114,7 +115,7 @@ func TestFilePathGiven(t *testing.T) {
 		t.Fatalf("cant creaste the folders: %v", err)
 	}
 
-	if err := save("a.txt", 3, filepath.Join(dir, "sub")); err != nil {
+	if err := save(filepath.Join(dir, "sub", "a.txt"), 3); err != nil {
 		t.Fatalf("cant save a file: %v", err)
 	}
 
@@ -122,4 +123,79 @@ func TestFilePathGiven(t *testing.T) {
 	if err == nil {
 		t.Fatalf("error should be thrown")
 	}
+}
+
+func TestSummary(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o700); err != nil {
+		t.Fatalf("cant create the sub: %v", err)
+	}
+
+	if err := os.MkdirAll(filepath.Join(dir, "empty"), 0o700); err != nil {
+		t.Fatalf("cant create the sub: %v", err)
+	}
+
+	if err := save(filepath.Join(dir, "a.txt"), 3); err != nil {
+		t.Fatalf("cant create the file: %v", err)
+	}
+
+	if err := save(filepath.Join(dir, "sub", "a.txt"), 5); err != nil {
+		t.Fatalf("cant save the file: %v", err)
+	}
+
+	want := []Result{
+		{entityName: "sub", entityType: "folder", size: 5},
+		{entityName: "a.txt", entityType: "file", size: 3},
+		{entityName: "empty", entityType: "folder", size: 0},
+	}
+	result, err := Summirize(dir)
+	if err != nil {
+		t.Fatalf("cant get the summary: %v", err)
+	}
+
+	if !slices.Equal(want, result) {
+		t.Fatalf("want: %v, got: %v", want, result)
+	}
+
+}
+
+func TestSummarySameSize(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o700); err != nil {
+		t.Fatalf("cant create the sub: %v", err)
+	}
+
+	if err := os.MkdirAll(filepath.Join(dir, "empty"), 0o700); err != nil {
+		t.Fatalf("cant create the sub: %v", err)
+	}
+
+	if err := save(filepath.Join(dir, "b.txt"), 3); err != nil {
+		t.Fatalf("cant create the file: %v", err)
+	}
+
+	if err := save(filepath.Join(dir, "a.txt"), 3); err != nil {
+		t.Fatalf("cant create the file: %v", err)
+	}
+
+	if err := save(filepath.Join(dir, "sub", "a.txt"), 5); err != nil {
+		t.Fatalf("cant save the file: %v", err)
+	}
+
+	want := []Result{
+		{entityName: "sub", entityType: "folder", size: 5},
+		{entityName: "a.txt", entityType: "file", size: 3},
+		{entityName: "b.txt", entityType: "file", size: 3},
+		{entityName: "empty", entityType: "folder", size: 0},
+	}
+	result, err := Summirize(dir)
+	if err != nil {
+		t.Fatalf("cant get the summary: %v", err)
+	}
+
+	if !slices.Equal(want, result) {
+		t.Fatalf("want: %v, got: %v", want, result)
+	}
+
 }

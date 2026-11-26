@@ -1,6 +1,8 @@
 package main
 
 import (
+	tea "charm.land/bubbletea/v2"
+
 	"cmp"
 	"fmt"
 	"log"
@@ -9,25 +11,94 @@ import (
 	"slices"
 )
 
+type model struct {
+	mainDir  string
+	total    int64
+	list     []Result
+	error    error
+	selected int
+}
+
+func (m model) Init() tea.Cmd {
+	m.selected = 0
+
+	return nil
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "down":
+			if m.selected < len(m.list)-1 {
+				m.selected++
+			}
+		case "up":
+			if m.selected > 0 {
+				m.selected--
+			}
+		}
+	case summary:
+		m.list = msg
+		var total int64
+		for _, entry := range msg {
+			total += entry.size
+		}
+		m.total = total
+	}
+
+	return m, nil
+}
+
+func (m model) View() tea.View {
+	if m.error != nil {
+		return tea.NewView(m.error.Error())
+	}
+
+	summary := fmt.Sprintf("Directory: %s\n\n", m.mainDir)
+	var total int64
+	for ind, entity := range m.list {
+		total += entity.size
+		if ind == m.selected {
+			summary += "> "
+		}
+		summary += fmt.Sprintf("%s (%d) - %s\n", entity.entityName, entity.size, entity.entityType)
+	}
+	if len(m.list) == 0 {
+		summary += fmt.Sprintf("No files or folders to display\n")
+	}
+	summary += fmt.Sprintf("Total: %d\n\n", total)
+
+	summary += fmt.Sprintf("↑/↓ select • q/Ctrl+C quit\n")
+
+	return tea.NewView(summary)
+}
+
 func main() {
 	if len(os.Args) != 2 {
 		log.Fatalf("cant get arguments")
 	}
 
-	result, err := Summirize(os.Args[1])
+	results, err := Summirize(os.Args[1])
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatalf("cant get the summary: %v", err)
 	}
 
-	summary := ""
-	var total int64 = 0
-	for _, one := range result {
-		summary += fmt.Sprintf("%s (%d)\n", one.entityName, one.size)
-		total += one.size
+	m := model{
+		mainDir: os.Args[1],
+		list:    results,
 	}
 
-	fmt.Printf("%s\nTotal: %d\n", summary, total)
+	program := tea.NewProgram(m)
+	if _, err := program.Run(); err != nil {
+		log.Fatalf("cant run the bubbletea")
+	}
 }
+
+type summary []Result
+type errorType error
 
 type Result struct {
 	entityName string
@@ -69,7 +140,6 @@ func Summirize(rootDir string) ([]Result, error) {
 	})
 
 	return result, nil
-
 }
 
 func Scan(currentDir string) (int64, error) {

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 func save(path string, size int) error {
@@ -108,7 +110,7 @@ func TestMissingPath(t *testing.T) {
 	}
 }
 
-func TestFilePathGiven(t *testing.T) {
+func TestFilePathShouldNotBeGiven(t *testing.T) {
 	dir := t.TempDir()
 
 	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o700); err != nil {
@@ -198,4 +200,85 @@ func TestSummarySameSize(t *testing.T) {
 		t.Fatalf("want: %v, got: %v", want, result)
 	}
 
+}
+
+func TestArrowKeys(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o700); err != nil {
+		t.Fatalf("cant create dir: %v", err)
+	}
+
+	if err := os.MkdirAll(filepath.Join(dir, "sub2"), 0o700); err != nil {
+		t.Fatalf("cant create dir: %v", err)
+	}
+
+	result, err := Summirize(dir)
+	if err != nil {
+		t.Fatalf("cant get the summary: %v", err)
+	}
+
+	m := model{
+		mainDir: dir,
+		list:    result,
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	got := updated.(model)
+
+	if got.selected != 1 {
+		t.Fatalf("expected: 1, got: %d", got.selected)
+	}
+
+	updated, _ = got.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	got = updated.(model)
+
+	if got.selected != 0 {
+		t.Fatalf("expected: 0, got: %d", got.selected)
+	}
+
+	updated, _ = got.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	got = updated.(model)
+
+	if got.selected != 0 {
+		t.Fatalf("expected: 0, got: %d", got.selected)
+	}
+
+	updated, _ = got.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	got = updated.(model)
+
+	updated, _ = got.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	got = updated.(model)
+
+	if got.selected != 1 {
+		t.Fatalf("expected: 1, got: %d", got.selected)
+	}
+}
+
+func TestEmptyFolder(t *testing.T) {
+	dir := t.TempDir()
+
+	result, err := Summirize(dir)
+	if err != nil {
+		t.Fatalf("cant get the summary: %v", err)
+	}
+
+	m := model{
+		mainDir: dir,
+		list:    result,
+	}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	got := updated.(model)
+
+	if got.selected != 0 {
+		t.Fatalf("expected: 0, got: %d", got.selected)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	got = updated.(model)
+
+	if got.selected != 0 {
+		t.Fatalf("expected: 0, got: %d", got.selected)
+	}
 }

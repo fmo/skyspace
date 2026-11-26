@@ -1,6 +1,6 @@
 # Next task: enter and leave folders
 
-**Status:** Ready to start.
+**Status:** Complete. Recorded under Unreleased in CHANGELOG.md.
 
 ## Goal
 

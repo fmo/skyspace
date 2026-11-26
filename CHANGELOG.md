@@ -4,6 +4,12 @@
 
 ### Added
 
+- Enter selected folders and return with Backspace, staying within the original
+  scan root even when launched with a relative path.
+- Navigation errors preserve the current view and appear alongside the list;
+  successful navigation clears errors and resets selection.
+- Navigation controls hint and tests for nested and empty folders, file entries,
+  root boundaries, selection reset, and failure recovery.
 - Bubble Tea interface with arrow-key selection and `q`/Ctrl+C to quit.
 - Directory heading, entry kinds and byte sizes, combined total, controls hint,
   and an empty-state message.

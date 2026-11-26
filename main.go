@@ -14,6 +14,7 @@ import (
 type model struct {
 	mainDir  string
 	total    int64
+	nav      string
 	list     []Result
 	error    error
 	selected int
@@ -35,6 +36,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.selected < len(m.list)-1 {
 				m.selected++
 			}
+		case "backspace":
+			if m.mainDir == m.nav {
+				return m, nil
+			}
+			parent := filepath.Dir(m.nav)
+			result, err := Summirize(parent)
+			if err != nil {
+				m.error = err
+				return m, nil
+			}
+			m.nav = parent
+			m.list = result
+			m.selected = 0
+			m.error = nil
+			return m, nil
+		case "enter":
+			if len(m.list) == 0 {
+				return m, nil
+			}
+			selected := m.list[m.selected]
+			if selected.entityType != "folder" {
+				return m, nil
+			}
+			nav := filepath.Join(m.nav, selected.entityName)
+			result, err := Summirize(nav)
+			if err != nil {
+				m.error = err
+				return m, nil
+			}
+			m.nav = nav
+			m.selected = 0
+			m.list = result
+			m.error = nil
+			return m, nil
 		case "up":
 			if m.selected > 0 {
 				m.selected--
@@ -53,11 +88,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
+	summary := fmt.Sprintf("Directory: %s\n\n", m.nav)
 	if m.error != nil {
-		return tea.NewView(m.error.Error())
+		summary += fmt.Sprintf("Error: %v\n\n", m.error)
 	}
-
-	summary := fmt.Sprintf("Directory: %s\n\n", m.mainDir)
 	var total int64
 	for ind, entity := range m.list {
 		total += entity.size
@@ -71,7 +105,7 @@ func (m model) View() tea.View {
 	}
 	summary += fmt.Sprintf("Total: %d\n\n", total)
 
-	summary += fmt.Sprintf("↑/↓ select • q/Ctrl+C quit\n")
+	summary += "↑/↓ select • Enter open • Backspace parent • q/Ctrl+C quit\n"
 
 	return tea.NewView(summary)
 }
@@ -81,13 +115,19 @@ func main() {
 		log.Fatalf("cant get arguments")
 	}
 
-	results, err := Summirize(os.Args[1])
+	rootDir, err := filepath.Abs(os.Args[1])
+	if err != nil {
+		log.Fatalf("cant resolve directory path: %v", err)
+	}
+
+	results, err := Summirize(rootDir)
 	if err != nil {
 		log.Fatalf("cant get the summary: %v", err)
 	}
 
 	m := model{
-		mainDir: os.Args[1],
+		mainDir: rootDir,
+		nav:     rootDir,
 		list:    results,
 	}
 
